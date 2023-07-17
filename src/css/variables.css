@@ -1,0 +1,5 @@
+:root {
+  /* For cell */
+  --flex-items: 3;
+  --flex-items-gap: 20px;
+}
