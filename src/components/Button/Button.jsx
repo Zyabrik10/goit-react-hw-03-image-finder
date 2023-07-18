@@ -3,7 +3,7 @@ import PropsType from 'props-type';
 
 export class Button extends Component {
   addMoreHandler = () => {
-    this.props.addImages();
+    this.props.increasePage();
   };
 
   render() {

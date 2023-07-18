@@ -14,6 +14,8 @@ export class App extends Component {
     loader: false,
     isModalOpen: false,
     largeImageSrcForModal: '',
+    areImagesInited: false,
+    showMoreButton: false,
   };
 
   inputSearchText = searchText => {
@@ -21,25 +23,12 @@ export class App extends Component {
   };
 
   setImages = images => {
-    this.setState({ images: images, page: 1, loader: true });
+    this.setState({ areImagesInited: true, images: images });
   };
 
-  addImages = () => {
-    const query = new URLSearchParams({
-      q: this.state.searchText,
-      page: this.state.page + 1,
-    }).toString();
-
-    this.setLoader(true);
-
-    fetchImages(query).then(data => {
-      this.state.images.push(...data.hits);
-      this.setLoader(false);
-      this.setState({
-        images: this.state.images,
-        page: this.state.page + 1,
-      });
-    });
+  addImages = images => {
+    this.state.images.push(...images);
+    this.setState({ images: this.state.images });
   };
 
   setLoader = value => {
@@ -54,17 +43,61 @@ export class App extends Component {
     this.setState({ largeImageSrcForModal: src });
   };
 
+  setDefaultPage = () => {
+    this.setState({ page: 1, areImagesInited: false });
+  };
+
+  increasePage = () => {
+    this.setState({ page: this.state.page + 1 });
+  };
+
+  showMoreButton = bool => {
+    this.setState({ showMoreButton: bool });
+  };
+
+  componentDidUpdate(prevPorps, prevState) {
+    if (this.state.loader) return;
+    const query = new URLSearchParams({
+      q: this.state.searchText,
+      page: this.state.page,
+    }).toString();
+
+    if (this.state.page === 1 && !this.state.areImagesInited) {
+      this.setLoader(true);
+
+      fetchImages(query).then(({ hits: images, totalHits }) => {
+        if (totalHits > 12) this.showMoreButton(true);
+        else this.showMoreButton(false);
+        this.setImages(images);
+        this.setLoader(false);
+      });
+    } else if (this.state.page !== prevState.page) {
+      this.setLoader(true);
+
+      fetchImages(query).then(({ hits: images, totalHits }) => {
+        if (this.state.images.length + 12 < totalHits)
+          this.showMoreButton(true);
+        else this.showMoreButton(false);
+        this.addImages(images);
+        this.setLoader(false);
+      });
+    }
+  }
+
   render() {
-    const { searchText, images, loader, isModalOpen, largeImageSrcForModal } =
-      this.state;
+    const {
+      showMoreButton,
+      images,
+      loader,
+      isModalOpen,
+      largeImageSrcForModal,
+    } = this.state;
 
     return (
       <div className="App">
         <Searchbar
-          setImages={this.setImages}
           inputSearchText={this.inputSearchText}
-          searchText={searchText}
-          setLoader={this.setLoader}
+          setDefaultPage={this.setDefaultPage}
         />
         <ImageGallery
           images={images}
@@ -78,7 +111,7 @@ export class App extends Component {
           triggerModalWindow={this.triggerModalWindow}
           setLargeImageSrcForModal={this.setLargeImageSrcForModal}
         />
-        {images.length ? <Button addImages={this.addImages} /> : null}
+        {showMoreButton ? <Button increasePage={this.increasePage} /> : null}
       </div>
     );
   }
