@@ -14,7 +14,6 @@ export class App extends Component {
     loader: false,
     isModalOpen: false,
     largeImageSrcForModal: '',
-    areImagesInited: false,
     showMoreButton: false,
   };
 
@@ -23,12 +22,11 @@ export class App extends Component {
   };
 
   setImages = images => {
-    this.setState({ areImagesInited: true, images: images });
+    this.setState({ images: images });
   };
 
   addImages = images => {
-    this.state.images.push(...images);
-    this.setState({ images: this.state.images });
+    this.setState(prev => ({ images: [...prev.images, ...images] }));
   };
 
   setLoader = value => {
@@ -44,44 +42,59 @@ export class App extends Component {
   };
 
   setDefaultPage = () => {
-    this.setState({ page: 1, areImagesInited: false });
+    this.setState({ page: 1 });
   };
 
   increasePage = () => {
-    this.setState({ page: this.state.page + 1 });
+    this.setState(prev => ({ page: prev.page + 1 }));
   };
 
   showMoreButton = bool => {
     this.setState({ showMoreButton: bool });
   };
 
-  componentDidUpdate(prevPorps, prevState) {
-    if (this.state.loader) return;
+  initMoreButton(callback) {
+    if (callback()) this.showMoreButton(true);
+    else this.showMoreButton(false);
+  }
+
+  async initImagesList(query) {
+    const { hits: images, totalHits } = await fetchImages(query);
+    this.setImages(images);
+    return totalHits;
+  }
+
+  async addToImagesList(query) {
+    const { hits: images, totalHits } = await fetchImages(query);
+    this.addImages(images);
+    return totalHits;
+  }
+
+  async updateImageList(prevState) {
     const query = new URLSearchParams({
       q: this.state.searchText,
       page: this.state.page,
     }).toString();
 
-    if (this.state.page === 1 && !this.state.areImagesInited) {
-      this.setLoader(true);
+    this.setLoader(true);
 
-      fetchImages(query).then(({ hits: images, totalHits }) => {
-        if (totalHits > 12) this.showMoreButton(true);
-        else this.showMoreButton(false);
-        this.setImages(images);
-        this.setLoader(false);
-      });
+    if (this.state.page === 1) {
+      const totalHits = await this.initImagesList(query);
+      this.initMoreButton(() => totalHits > 12);
     } else if (this.state.page !== prevState.page) {
-      this.setLoader(true);
-
-      fetchImages(query).then(({ hits: images, totalHits }) => {
-        if (this.state.images.length + 12 < totalHits)
-          this.showMoreButton(true);
-        else this.showMoreButton(false);
-        this.addImages(images);
-        this.setLoader(false);
-      });
+      const totalHits = await this.addToImagesList(query);
+      this.initMoreButton(() => this.state.images.length + 12 < totalHits);
     }
+
+    this.setLoader(false);
+  }
+
+  componentDidUpdate(prevPorps, prevState) {
+    if (
+      prevState.page !== this.state.page ||
+      prevState.searchText !== this.state.searchText
+    )
+      this.updateImageList(prevState);
   }
 
   render() {
